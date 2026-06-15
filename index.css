@@ -1,0 +1,57 @@
+/* Estilos Globales */
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@theme {
+  --color-brand-orange: #D35400;
+  --color-brand-dark: #111111;
+  --color-brand-gray: #222222;
+  
+  --font-sans: "Inter", "system-ui", sans-serif;
+  --font-display: "Impact", "Arial Black", sans-serif;
+  --font-burbank: "Burbank Big Condensed", "Impact", sans-serif;
+}
+
+:root {
+  --brand-orange: #D35400;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- REGISTRO DE FUENTES PERSONALIZADAS --- */
+@font-face {
+  font-family: 'BurbankBigCondensed-Black';
+  src: url('/fonts/burbankbigcondensed_black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'BurbankBigCondensed-Bold';
+  src: url('/fonts/burbankbigcondensed_bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* Custom scrollbar for dark theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #111;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
