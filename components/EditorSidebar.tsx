@@ -360,25 +360,6 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
             </div>
         )}
 
-        {/* Price Tag Color */}
-        <div className="space-y-1">
-            <label className="text-xs text-neutral-400">Price Tag Accent</label>
-            <div className="flex gap-2">
-            <input 
-                type="color" 
-                value={config.priceTagColor}
-                onChange={(e) => setConfig({ ...config, priceTagColor: e.target.value })}
-                className="h-9 w-9 p-0 border-none rounded cursor-pointer bg-transparent"
-            />
-            <input 
-                type="text" 
-                value={config.priceTagColor}
-                onChange={(e) => setConfig({ ...config, priceTagColor: e.target.value })}
-                className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 text-sm focus:border-brand-orange focus:outline-none"
-            />
-            </div>
-        </div>
-
         {/* Logo */}
         <div className="space-y-2">
             <label className="text-xs text-neutral-400">Main Logo</label>

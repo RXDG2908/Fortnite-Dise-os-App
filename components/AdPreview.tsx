@@ -166,20 +166,45 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
 
                     {/* Price Tag & Info */}
                     <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-1 pointer-events-none z-20">
-                      <div 
-                        className="self-start bg-neutral-900/90 px-4 py-2 rounded transform -skew-x-12 border-l-4 shadow-lg"
-                        style={{ borderColor: config.priceTagColor }}
-                      >
-                        <span 
-                            className="block transform skew-x-12 text-white tracking-wider leading-none"
+                      {config.priceTagBgSrc ? (
+                        <div 
+                          className="self-start relative flex items-center justify-center select-none"
+                          style={{
+                            backgroundImage: `url(${config.priceTagBgSrc})`,
+                            backgroundSize: 'contain',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            height: `${config.priceSize * 1.35}px`,
+                            width: `${config.priceSize * 1.35 * (1208 / 465)}px`,
+                          }}
+                        >
+                          <span 
+                            className="text-white tracking-wider leading-none text-center font-bold"
                             style={{ 
                               fontSize: `${config.priceSize}px`,
-                              fontFamily: config.fontFamily === 'Inter' ? undefined : config.fontFamily
+                              fontFamily: config.fontFamily === 'Inter' ? undefined : config.fontFamily,
+                              transform: 'translateY(-2%)'
                             }}
                           >
-                          {item.price}
-                        </span>
-                      </div>
+                            {item.price}
+                          </span>
+                        </div>
+                      ) : (
+                        <div 
+                          className="self-start bg-neutral-900/90 px-4 py-2 rounded transform -skew-x-12 border-l-4 shadow-lg"
+                          style={{ borderColor: config.priceTagColor }}
+                        >
+                          <span 
+                              className="block transform skew-x-12 text-white tracking-wider leading-none"
+                              style={{ 
+                                fontSize: `${config.priceSize}px`,
+                                fontFamily: config.fontFamily === 'Inter' ? undefined : config.fontFamily
+                              }}
+                            >
+                            {item.price}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {isSelected && (

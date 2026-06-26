@@ -23,6 +23,7 @@ export default function App() {
     footerImageSrc: '/images/footer/FOOTER.png',
     useFooterImage: true,
     priceTagColor: '#D35400', 
+    priceTagBgSrc: '/images/footer/PRICE_BG.png',
     gridColumns: 4,
     priceSize: 48, // Default 48px (text-5xl approx)
     fontFamily: 'BurbankBigCondensed-Black',

@@ -36,6 +36,7 @@ export interface AdConfig {
   footerImageSrc: string | null;
   useFooterImage: boolean;
   priceTagColor: string;
+  priceTagBgSrc: string | null;
   gridColumns: 3 | 4;
   priceSize: number; // Font size in pixels
   fontFamily: string;
