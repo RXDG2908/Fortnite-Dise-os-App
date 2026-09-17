@@ -143,11 +143,9 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
   const availableWidth = 1200 - horizontalPadding;
   const columnWidth = (availableWidth - (gapSize * (config.gridColumns - 1))) / config.gridColumns;
 
-  // Las cards individuales (span 1) son verticales tipo retrato, igual que en fortnite.com
-  // (Size_1_x_1 = 1024x1632, aspecto 1.594:1). Las cards anchas (2x, 3x, 4x) son más bajas,
-  // tipo banner horizontal, y mantienen la altura de una sola columna (igual que antes).
+  // Todas las cards (1x, 2x, 3x, 4x) comparten la misma altura tipo retrato
+  // (Size_1_x_1 = 1024x1632, aspecto 1.594:1); solo el ancho crece según el span.
   const PORTRAIT_ASPECT = 1632 / 1024;
-  const baseHeight = columnWidth;
   const portraitHeight = columnWidth * PORTRAIT_ASPECT;
 
   // Radio de esquina real de Fortnite: 40px sobre una card base de 512px (~7.8% del ancho).
@@ -403,7 +401,7 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
                   4: 'col-span-4'
                 }[item.span];
 
-                const finalHeight = item.span === 1 ? portraitHeight : baseHeight;
+                const finalHeight = portraitHeight;
 
                 const isSelected = selectedId === item.id;
                 const isDragging = draggingIndex === index;
