@@ -13,9 +13,10 @@ export interface AdItem {
   fadeLeft: number;
   fadeRight: number;
   allowOverflow?: boolean;
+  priceImageSrc?: string | null;
 }
 
-export type AdMode = 'products' | 'qr';
+export type AdMode = 'products' | 'qr' | 'inp_card';
 
 export interface QRConfig {
   url: string;
@@ -35,8 +36,6 @@ export interface AdConfig {
   footerColor: string;
   footerImageSrc: string | null;
   useFooterImage: boolean;
-  priceTagColor: string;
-  priceTagBgSrc: string | null;
   gridColumns: 3 | 4;
   priceSize: number; // Font size in pixels
   fontFamily: string;

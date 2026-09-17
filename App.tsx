@@ -22,8 +22,6 @@ export default function App() {
     footerColor: '#E91E63',
     footerImageSrc: '/images/footer/FOOTER.png',
     useFooterImage: true,
-    priceTagColor: '#D35400', 
-    priceTagBgSrc: '/images/footer/PRICE_BG.png',
     gridColumns: 4,
     priceSize: 48, // Default 48px (text-5xl approx)
     fontFamily: 'BurbankBigCondensed-Black',
@@ -114,10 +112,10 @@ export default function App() {
       for (const file of files) {
         const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
         let extractedPrice = 'S/19.99'; 
-        const priceMatch = nameWithoutExt.match(/\sS\s*(\d+(\.\d{1,2})?)$/i);
+        const priceMatch = nameWithoutExt.match(/(?:[\s\-_]|\b)S(?:\/\.|\/)?\s*(\d+(?:\.\d+)?)$/i) || nameWithoutExt.match(/\s+(\d+(?:\.\d+)?)$/);
         
         if (priceMatch && priceMatch[1]) {
-            extractedPrice = `S/${priceMatch[1]}`;
+            extractedPrice = `S/. ${parseFloat(priceMatch[1])}`;
         }
 
         // Optimizamos la imagen antes de añadirla al estado
@@ -137,10 +135,16 @@ export default function App() {
           fadeLeft: 0,
           fadeRight: 0,
           allowOverflow: false,
+          priceImageSrc: null,
         });
       }
       setItems((prev) => [...prev, ...newItems]);
     }
+  };
+
+  const handleUploadItemPriceImage = async (id: string, file: File) => {
+    const optimizedSrc = await resizeImage(file, 800);
+    updateItem(id, { priceImageSrc: optimizedSrc });
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,62 +205,98 @@ export default function App() {
   };
 
   const handleExport = useCallback(async () => {
-    if (previewRef.current === null) return;
     setIsExporting(true);
     setSelectedId(null);
     
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('Attempting Ultra-HD export (JPEG, 3x)...');
-      
-      // JPEG es más eficiente en memoria para resoluciones altas
-      const dataUrl = await toJpeg(previewRef.current, { 
-        quality: 0.98,
-        pixelRatio: 3, // 3600px de ancho (Ultra HD)
-        backgroundColor: config.backgroundColor,
-        cacheBust: true,
-      });
 
-      const link = document.createElement('a');
-      link.download = `rxdg-ad-ultrahd-${Date.now()}.jpg`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (config.mode === 'inp_card') {
+        console.log('Exporting all INP CARD products individually in 3:4 aspect ratio...');
+        let count = 0;
+        for (const item of items) {
+          const element = document.getElementById(`product-card-${item.id}`);
+          if (element) {
+            try {
+              const dataUrl = await toJpeg(element, { 
+                quality: 0.98,
+                pixelRatio: 3, // Ultra-HD 3:4 (3 * 600 = 1800px width)
+                backgroundColor: config.backgroundColor,
+                cacheBust: true,
+              });
+              
+              const link = document.createElement('a');
+              const sanitizedName = (item.name || `producto-${count + 1}`).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+              link.download = `rxdg-tiktok-${sanitizedName}-${Date.now()}.jpg`;
+              link.href = dataUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              count++;
+              // Wait briefly between triggers so browser doesn't block parallel downloads
+              await new Promise(resolve => setTimeout(resolve, 300));
+            } catch (cardErr) {
+              console.error(`Failed to export card for product ${item.id}`, cardErr);
+            }
+          }
+        }
+      } else {
+        if (previewRef.current === null) return;
+        console.log('Attempting Ultra-HD export (JPEG, 3x)...');
+        
+        // JPEG es más eficiente en memoria para resoluciones altas
+        const dataUrl = await toJpeg(previewRef.current, { 
+          quality: 0.98,
+          pixelRatio: 3, // 3600px de ancho (Ultra HD)
+          backgroundColor: config.backgroundColor,
+          cacheBust: true,
+        });
+
+        const link = document.createElement('a');
+        link.download = `rxdg-ad-ultrahd-${Date.now()}.jpg`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
 
     } catch (err: any) {
       console.error('Ultra-HD Export failed, trying 2x...', err);
-      try {
-        // Reintento automático a 2x (2400px) si 3x falla
-        const dataUrl = await toJpeg(previewRef.current, { 
-          quality: 0.95,
-          pixelRatio: 2, 
-          backgroundColor: config.backgroundColor,
-        });
-        const link = document.createElement('a');
-        link.download = `rxdg-ad-hd-${Date.now()}.jpg`;
-        link.href = dataUrl;
-        link.click();
-      } catch (retryErr) {
-        console.error('HD Export failed, trying 1.5x...', retryErr);
+      if (config.mode !== 'inp_card' && previewRef.current) {
         try {
+          // Reintento automático a 2x (2400px) si 3x falla
           const dataUrl = await toJpeg(previewRef.current, { 
-            quality: 0.90,
-            pixelRatio: 1.5, 
+            quality: 0.95,
+            pixelRatio: 2, 
             backgroundColor: config.backgroundColor,
           });
           const link = document.createElement('a');
-          link.download = `rxdg-ad-high-${Date.now()}.jpg`;
+          link.download = `rxdg-ad-hd-${Date.now()}.jpg`;
           link.href = dataUrl;
           link.click();
-        } catch (finalErr) {
-          alert('La imagen es demasiado compleja para la memoria de tu navegador. Intenta reducir el número de objetos o usa imágenes más pequeñas.');
+        } catch (retryErr) {
+          console.error('HD Export failed, trying 1.5x...', retryErr);
+          try {
+            const dataUrl = await toJpeg(previewRef.current, { 
+              quality: 0.90,
+              pixelRatio: 1.5, 
+              backgroundColor: config.backgroundColor,
+            });
+            const link = document.createElement('a');
+            link.download = `rxdg-ad-high-${Date.now()}.jpg`;
+            link.href = dataUrl;
+            link.click();
+          } catch (finalErr) {
+            alert('La imagen es demasiado compleja para la memoria de tu navegador. Intenta reducir el número de objetos o usa imágenes más pequeñas.');
+          }
         }
+      } else {
+        alert('Hubo un error al exportar las tarjetas de TikTok. Intenta de nuevo.');
       }
     } finally {
       setIsExporting(false);
     }
-  }, [config.backgroundColor]);
+  }, [config.backgroundColor, config.mode, items]);
 
   const selectedItem = items.find((i) => i.id === selectedId);
 
@@ -288,6 +328,7 @@ export default function App() {
              onUploadBackground={handleBackgroundUpload}
              onUploadCardBackground={handleCardBackgroundUpload}
              onUploadFooterImage={handleFooterImageUpload}
+             onUploadItemPriceImage={handleUploadItemPriceImage}
            />
         </div>
 
@@ -303,7 +344,7 @@ export default function App() {
              {isExporting ? 'Rendering...' : (
                <>
                  <Download size={20} />
-                 Export Ultra-HD JPG
+                 {config.mode === 'inp_card' ? 'Exportar Todos (3:4)' : 'Export Ultra-HD JPG'}
                </>
              )}
            </button>

@@ -1,7 +1,27 @@
 
 import React, { useState } from 'react';
 import { AdItem, AdConfig, SPAN_OPTIONS } from '../types';
-import { Upload, Trash, ArrowUp, ArrowDown, Palette, Image as ImageIcon, X, MoveVertical, MoveHorizontal, ZoomIn, Grid3x3, Grid2x2, Maximize, Square, Type, Link, QrCode, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, Trash, ArrowUp, ArrowDown, Palette, Image as ImageIcon, X, MoveVertical, MoveHorizontal, ZoomIn, Grid3x3, Grid2x2, Maximize, Square, Type, Link, QrCode, ShoppingCart, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+
+function getPriceImageFilename(price: string): string {
+  if (!price) return 'S0.png';
+  let clean = price.trim().toUpperCase().replace(/\s+/g, '');
+  
+  // Normalize prefix by stripping "S/.", "S/", "S"
+  const cleanNum = clean.replace(/^S\/\./, '').replace(/^S\//, '').replace(/^S/, '').trim();
+  const num = parseFloat(cleanNum);
+  
+  if (!isNaN(num)) {
+    // Specific match for "S/.4" -> "S3.png" as user requested
+    if (num === 4) {
+      return 'S3.png';
+    }
+    return `S${num}.png`;
+  }
+  
+  // Fallback if not a clean number
+  return clean.endsWith('.png') ? clean : `${clean}.png`;
+}
 
 interface EditorSidebarProps {
   config: AdConfig;
@@ -16,6 +36,7 @@ interface EditorSidebarProps {
   onUploadBackground: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUploadCardBackground: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUploadFooterImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onUploadItemPriceImage: (id: string, file: File) => void;
 }
 
 const EditorSidebar: React.FC<EditorSidebarProps> = ({
@@ -31,6 +52,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   onUploadBackground,
   onUploadCardBackground,
   onUploadFooterImage,
+  onUploadItemPriceImage,
 }) => {
   const [isFadeExpanded, setIsFadeExpanded] = useState(false);
   const [isBgExpanded, setIsBgExpanded] = useState(false);
@@ -41,18 +63,24 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
       {/* 0. Mode Selector */}
       <section className="space-y-4">
         <h2 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Modo de Diseño</h2>
-        <div className="flex bg-neutral-800 rounded-xl p-1 border border-neutral-700 shadow-inner">
+        <div className="flex bg-neutral-800 rounded-xl p-1 border border-neutral-700 shadow-inner gap-1">
           <button 
             onClick={() => setConfig({...config, mode: 'products'})}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold rounded-lg transition-all ${config.mode === 'products' ? 'bg-brand-orange text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-1 text-[11px] font-bold rounded-lg transition-all ${config.mode === 'products' ? 'bg-brand-orange text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
           >
-            <ShoppingCart size={16} /> Productos
+            <ShoppingCart size={14} /> Productos
+          </button>
+          <button 
+            onClick={() => setConfig({...config, mode: 'inp_card'})}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-1 text-[11px] font-bold rounded-lg transition-all ${config.mode === 'inp_card' ? 'bg-brand-orange text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
+          >
+            <Layers size={14} /> INP CARD
           </button>
           <button 
             onClick={() => setConfig({...config, mode: 'qr'})}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold rounded-lg transition-all ${config.mode === 'qr' ? 'bg-brand-orange text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-1 text-[11px] font-bold rounded-lg transition-all ${config.mode === 'qr' ? 'bg-brand-orange text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
           >
-            <QrCode size={16} /> Código QR
+            <QrCode size={14} /> Código QR
           </button>
         </div>
       </section>
@@ -150,50 +178,52 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
         <h2 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Global Styling</h2>
         
         {/* Grid Layout Selector */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs text-neutral-400">Relación de Aspecto (Canvas)</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'none', label: 'Default' },
-                { value: '16/9', label: '16:9' },
-                { value: '9/16', label: '9:16 (Story)' },
-                { value: '1/1', label: '1:1' },
-                { value: '4/5', label: '4:5 (Post)' }
-              ].map((ratio) => (
-                <button
-                  key={ratio.value}
-                  onClick={() => setConfig({ ...config, aspectRatio: ratio.value as any })}
-                  className={`py-1.5 px-1 text-[10px] font-bold rounded border transition-all
-                    ${config.aspectRatio === ratio.value 
-                      ? 'bg-brand-orange border-brand-orange text-white' 
-                      : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:border-neutral-500'}
-                  `}
+        {config.mode === 'products' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs text-neutral-400">Relación de Aspecto (Canvas)</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'none', label: 'Default' },
+                  { value: '16/9', label: '16:9' },
+                  { value: '9/16', label: '9:16 (Story)' },
+                  { value: '1/1', label: '1:1' },
+                  { value: '4/5', label: '4:5 (Post)' }
+                ].map((ratio) => (
+                  <button
+                    key={ratio.value}
+                    onClick={() => setConfig({ ...config, aspectRatio: ratio.value as any })}
+                    className={`py-1.5 px-1 text-[10px] font-bold rounded border transition-all
+                      ${config.aspectRatio === ratio.value 
+                        ? 'bg-brand-orange border-brand-orange text-white' 
+                        : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:border-neutral-500'}
+                    `}
+                  >
+                    {ratio.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-xs text-neutral-400">Layout Grid</label>
+              <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
+                <button 
+                  onClick={() => setConfig({...config, gridColumns: 3})}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded ${config.gridColumns === 3 ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
                 >
-                  {ratio.label}
+                  <Grid2x2 size={14} /> 3 Columns
                 </button>
-              ))}
+                <button 
+                  onClick={() => setConfig({...config, gridColumns: 4})}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded ${config.gridColumns === 4 ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+                >
+                  <Grid3x3 size={14} /> 4 Columns
+                </button>
+              </div>
             </div>
           </div>
-          
-          <div className="space-y-2">
-            <label className="text-xs text-neutral-400">Layout Grid</label>
-            <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
-              <button 
-                onClick={() => setConfig({...config, gridColumns: 3})}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded ${config.gridColumns === 3 ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-              >
-                <Grid2x2 size={14} /> 3 Columns
-              </button>
-              <button 
-                onClick={() => setConfig({...config, gridColumns: 4})}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded ${config.gridColumns === 4 ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-              >
-                <Grid3x3 size={14} /> 4 Columns
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Price Font Size Control */}
         <div className="space-y-2">
@@ -360,131 +390,136 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
             </div>
         )}
 
-        {/* Logo */}
-        <div className="space-y-2">
-            <label className="text-xs text-neutral-400">Main Logo</label>
-            <label className="flex items-center gap-2 w-full p-2 bg-neutral-800 hover:bg-neutral-700 rounded border border-neutral-700 cursor-pointer text-sm">
-                <Upload size={14} />
-                <span>Upload Logo (Center)</span>
-                <input type="file" accept="image/*" onChange={onUploadLogo} className="hidden" />
-            </label>
-             {config.headerLogoSrc && (
-                 <div className="relative w-full p-2 bg-neutral-800 rounded border border-neutral-700 flex justify-center">
-                    <img src={config.headerLogoSrc} className="h-10 object-contain" alt="Logo Preview" />
-                    <button 
-                      onClick={() => setConfig({...config, headerLogoSrc: null})}
-                      className="absolute top-1 right-1 bg-black/70 p-1 rounded-full text-white hover:bg-red-500"
-                    >
-                      <X size={12} />
-                    </button>
-                 </div>
-               )}
-        </div>
-
-        {/* Footer */}
-        <div className="space-y-3 pt-2 border-t border-neutral-800">
-          <label className="text-xs text-neutral-400 font-bold">Pie de Página (Footer)</label>
-          <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
-            <button 
-              onClick={() => setConfig({...config, useFooterImage: false})}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded ${!config.useFooterImage ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-            >
-              <Type size={12} /> Texto
-            </button>
-            <button 
-              onClick={() => setConfig({...config, useFooterImage: true})}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded ${config.useFooterImage ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
-            >
-              <ImageIcon size={12} /> Imagen
-            </button>
-          </div>
-
-          {!config.useFooterImage ? (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400">Footer Text</label>
-                <input 
-                  type="text"
-                  value={config.footerText}
-                  onChange={(e) => setConfig({ ...config, footerText: e.target.value })}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-sm focus:border-brand-orange focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400">Footer Color</label>
-                <div className="flex gap-2">
-                   <input 
-                    type="color" 
-                    value={config.footerColor}
-                    onChange={(e) => setConfig({ ...config, footerColor: e.target.value })}
-                    className="h-9 w-9 p-0 border-none rounded cursor-pointer bg-transparent"
-                   />
-                   <input 
-                     type="text" 
-                     value={config.footerColor}
-                     onChange={(e) => setConfig({ ...config, footerColor: e.target.value })}
-                     className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 text-sm focus:border-brand-orange focus:outline-none"
-                   />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400 flex justify-between">
-                  <span>Footer Image</span>
-                  <span className="text-[10px] text-neutral-500">PNG transparente ideal</span>
-                </label>
-                <div className="flex gap-2">
-                  <label className="flex items-center gap-2 flex-1 p-2 bg-neutral-800 hover:bg-neutral-700 rounded border border-neutral-700 cursor-pointer text-sm transition-colors">
+        {/* Logo and Footer sections (Only in Products mode) */}
+        {config.mode === 'products' && (
+          <>
+            {/* Logo */}
+            <div className="space-y-2">
+                <label className="text-xs text-neutral-400">Main Logo</label>
+                <label className="flex items-center gap-2 w-full p-2 bg-neutral-800 hover:bg-neutral-700 rounded border border-neutral-700 cursor-pointer text-sm">
                     <Upload size={14} />
-                    <span>Subir Imagen</span>
-                    <input type="file" accept="image/*" onChange={onUploadFooterImage} className="hidden" />
-                  </label>
-                  <div className="flex items-center gap-2 flex-[1.5] bg-neutral-800 border border-neutral-700 rounded px-2 focus-within:border-brand-orange transition-colors">
-                    <Link size={14} className="text-neutral-500" />
-                    <input 
-                      type="text" 
-                      placeholder="Paste image URL or path..."
-                      value={config.footerImageSrc || ''}
-                      onChange={(e) => setConfig({ ...config, footerImageSrc: e.target.value })}
-                      className="w-full bg-transparent py-2 text-xs text-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <p className="text-[10px] text-neutral-500 leading-tight pt-1">
-                  También puedes arrastrarla aquí o subirla a <code className="text-brand-orange bg-black/30 px-1 py-0.5 rounded">/images/footer/</code> en el explorador.
-                </p>
-              </div>
+                    <span>Upload Logo (Center)</span>
+                    <input type="file" accept="image/*" onChange={onUploadLogo} className="hidden" />
+                </label>
+                 {config.headerLogoSrc && (
+                     <div className="relative w-full p-2 bg-neutral-800 rounded border border-neutral-700 flex justify-center">
+                        <img src={config.headerLogoSrc} className="h-10 object-contain" alt="Logo Preview" />
+                        <button 
+                          onClick={() => setConfig({...config, headerLogoSrc: null})}
+                          className="absolute top-1 right-1 bg-black/70 p-1 rounded-full text-white hover:bg-red-500"
+                        >
+                          <X size={12} />
+                        </button>
+                     </div>
+                   )}
+            </div>
 
-              {/* Quick select folder file if exists */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-neutral-400 font-bold uppercase block">Archivos Disponibles</label>
-                <button
-                  type="button"
-                  onClick={() => setConfig({ ...config, footerImageSrc: '/images/footer/FOOTER.png', useFooterImage: true })}
-                  className="w-full text-left text-xs bg-neutral-800 hover:bg-brand-orange/20 border border-neutral-700 hover:border-brand-orange p-2 rounded flex items-center justify-between text-neutral-300 transition-colors"
+            {/* Footer */}
+            <div className="space-y-3 pt-2 border-t border-neutral-800">
+              <label className="text-xs text-neutral-400 font-bold">Pie de Página (Footer)</label>
+              <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
+                <button 
+                  onClick={() => setConfig({...config, useFooterImage: false})}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded ${!config.useFooterImage ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
                 >
-                  <span className="truncate font-mono">/images/footer/FOOTER.png</span>
-                  <span className="text-[10px] bg-neutral-700 px-1.5 py-0.5 rounded text-white font-sans">Usar</span>
+                  <Type size={12} /> Texto
+                </button>
+                <button 
+                  onClick={() => setConfig({...config, useFooterImage: true})}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded ${config.useFooterImage ? 'bg-brand-orange text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+                >
+                  <ImageIcon size={12} /> Imagen
                 </button>
               </div>
 
-              {config.footerImageSrc && (
-                <div className="relative w-full p-2 bg-neutral-800 rounded border border-neutral-700 flex justify-center">
-                  <img src={config.footerImageSrc} className="h-10 object-contain" alt="Footer Preview" />
-                  <button 
-                    onClick={() => setConfig({...config, footerImageSrc: null})}
-                    className="absolute top-1 right-1 bg-black/70 p-1 rounded-full text-white hover:bg-red-500 animate-fade-in"
-                  >
-                    <X size={12} />
-                  </button>
+              {!config.useFooterImage ? (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400">Footer Text</label>
+                    <input 
+                      type="text"
+                      value={config.footerText}
+                      onChange={(e) => setConfig({ ...config, footerText: e.target.value })}
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-sm focus:border-brand-orange focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400">Footer Color</label>
+                    <div className="flex gap-2">
+                       <input 
+                        type="color" 
+                        value={config.footerColor}
+                        onChange={(e) => setConfig({ ...config, footerColor: e.target.value })}
+                        className="h-9 w-9 p-0 border-none rounded cursor-pointer bg-transparent"
+                       />
+                       <input 
+                         type="text" 
+                         value={config.footerColor}
+                         onChange={(e) => setConfig({ ...config, footerColor: e.target.value })}
+                         className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 text-sm focus:border-brand-orange focus:outline-none"
+                       />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400 flex justify-between">
+                      <span>Footer Image</span>
+                      <span className="text-[10px] text-neutral-500">PNG transparente ideal</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <label className="flex items-center gap-2 flex-1 p-2 bg-neutral-800 hover:bg-neutral-700 rounded border border-neutral-700 cursor-pointer text-sm transition-colors">
+                        <Upload size={14} />
+                        <span>Subir Imagen</span>
+                        <input type="file" accept="image/*" onChange={onUploadFooterImage} className="hidden" />
+                      </label>
+                      <div className="flex items-center gap-2 flex-[1.5] bg-neutral-800 border border-neutral-700 rounded px-2 focus-within:border-brand-orange transition-colors">
+                        <Link size={14} className="text-neutral-500" />
+                        <input 
+                          type="text" 
+                          placeholder="Paste image URL or path..."
+                          value={config.footerImageSrc || ''}
+                          onChange={(e) => setConfig({ ...config, footerImageSrc: e.target.value })}
+                          className="w-full bg-transparent py-2 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-neutral-500 leading-tight pt-1">
+                      También puedes arrastrarla aquí o subirla a <code className="text-brand-orange bg-black/30 px-1 py-0.5 rounded">/images/footer/</code> en el explorador.
+                    </p>
+                  </div>
+
+                  {/* Quick select folder file if exists */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-neutral-400 font-bold uppercase block">Archivos Disponibles</label>
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, footerImageSrc: '/images/footer/FOOTER.png', useFooterImage: true })}
+                      className="w-full text-left text-xs bg-neutral-800 hover:bg-brand-orange/20 border border-neutral-700 hover:border-brand-orange p-2 rounded flex items-center justify-between text-neutral-300 transition-colors"
+                    >
+                      <span className="truncate font-mono">/images/footer/FOOTER.png</span>
+                      <span className="text-[10px] bg-neutral-700 px-1.5 py-0.5 rounded text-white font-sans">Usar</span>
+                    </button>
+                  </div>
+
+                  {config.footerImageSrc && (
+                    <div className="relative w-full p-2 bg-neutral-800 rounded border border-neutral-700 flex justify-center">
+                      <img src={config.footerImageSrc} className="h-10 object-contain" alt="Footer Preview" />
+                      <button 
+                        onClick={() => setConfig({...config, footerImageSrc: null})}
+                        className="absolute top-1 right-1 bg-black/70 p-1 rounded-full text-white hover:bg-red-500 animate-fade-in"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </section>
 
       {/* 3. Item Inspector */}
@@ -552,7 +587,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
             {/* Price */}
             <div className="space-y-1">
-              <label className="text-xs text-neutral-400 font-medium">Price Tag</label>
+              <label className="text-xs text-neutral-400 font-medium">Price (Fallback Texto)</label>
               <div className="relative">
                 <input 
                   type="text" 
@@ -561,7 +596,12 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 pl-3 text-white font-bold tracking-wider focus:ring-1 focus:ring-brand-orange focus:outline-none"
                 />
               </div>
+              <p className="text-[10px] text-neutral-400 mt-1 italic">
+                Auto-imagen buscada: <code className="text-brand-orange bg-neutral-950 px-1 py-0.5 rounded font-mono">/images/logo/PRECIOS/{getPriceImageFilename(selectedItem.price)}</code>
+              </p>
             </div>
+
+
 
             {/* Position & Scale Group */}
             <div className="space-y-3 pt-2 border-t border-neutral-700/50">

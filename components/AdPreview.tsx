@@ -1,7 +1,120 @@
 
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { AdItem, AdConfig } from '../types';
 import { QRCodeCanvas } from 'qrcode.react';
+import { toJpeg } from 'html-to-image';
+import { Download } from 'lucide-react';
+
+function getPriceImageFilename(price: string): string {
+  if (!price) return 'S0.png';
+  let clean = price.trim().toUpperCase().replace(/\s+/g, '');
+  
+  // Normalize prefix by stripping "S/.", "S/", "S"
+  const cleanNum = clean.replace(/^S\/\./, '').replace(/^S\//, '').replace(/^S/, '').trim();
+  const num = parseFloat(cleanNum);
+  
+  if (!isNaN(num)) {
+    // Specific match for "S/.4" -> "S3.png" as user requested
+    if (num === 4) {
+      return 'S3.png';
+    }
+    return `S${num}.png`;
+  }
+  
+  // Fallback if not a clean number
+  return clean.endsWith('.png') ? clean : `${clean}.png`;
+}
+
+interface PriceImageProps {
+  item: AdItem;
+  priceSize: number;
+  fontFamily: string;
+}
+
+const PriceImage: React.FC<PriceImageProps> = ({ item, priceSize, fontFamily }) => {
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  const candidates = React.useMemo(() => {
+    if (item.priceImageSrc) {
+      return [item.priceImageSrc];
+    }
+
+    const baseFilename = getPriceImageFilename(item.price);
+    const lowerFilename = baseFilename.toLowerCase();
+    const upperFilename = baseFilename.toUpperCase();
+
+    let cleanNum = item.price ? item.price.trim().toUpperCase().replace(/\s+/g, '').replace(/^S\/\./, '').replace(/^S\//, '').replace(/^S/, '') : '';
+    const num = parseFloat(cleanNum);
+    const numCandidates: string[] = [];
+    if (!isNaN(num)) {
+      numCandidates.push(`S${num}.png`, `s${num}.png`, `S${num}.PNG`, `s${num}.PNG`);
+    }
+
+    const uniqueCandidates = Array.from(new Set([
+      `/images/logo/PRECIOS/${baseFilename}`,
+      `/images/logo/PRECIOS/${lowerFilename}`,
+      `/images/logo/PRECIOS/${upperFilename}`,
+      ...numCandidates.map(c => `/images/logo/PRECIOS/${c}`)
+    ]));
+
+    return uniqueCandidates;
+  }, [item.priceImageSrc, item.price]);
+
+  useEffect(() => {
+    setCandidateIndex(0);
+    setHasError(false);
+  }, [candidates]);
+
+  const currentSrc = candidates[candidateIndex];
+
+  const handleImageError = () => {
+    if (candidateIndex < candidates.length - 1) {
+      setCandidateIndex(prev => prev + 1);
+    } else {
+      setHasError(true);
+    }
+  };
+
+  const isWide = item.span >= 2;
+
+  if (hasError) {
+    const filename = getPriceImageFilename(item.price);
+    return (
+      <div className={`flex flex-col ${isWide ? 'items-start pl-2' : 'items-center'} bg-black/60 px-4 py-2.5 rounded-lg border border-white/20 shadow-xl backdrop-blur-sm pointer-events-auto select-none`}>
+        <span 
+          className={`text-[#E6F2FF] font-black leading-none select-none tracking-tight ${isWide ? 'text-left' : 'text-center'}`}
+          style={{ 
+            fontSize: `${priceSize}px`,
+            fontFamily: fontFamily === 'Inter' ? undefined : fontFamily,
+            textShadow: `${Math.max(2, Math.round(priceSize * 0.08))}px ${Math.max(2, Math.round(priceSize * 0.08))}px 0px #000B47`,
+          }}
+        >
+          {item.price || 'S/.0'}
+        </span>
+        <span className="text-[9px] font-mono text-neutral-400 mt-1 select-all bg-neutral-900/80 px-1.5 py-0.5 rounded border border-neutral-800">
+          Subir: {filename}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className={`${isWide ? 'self-start pl-2' : 'self-center'} flex items-center justify-center select-none`}
+      style={{
+        height: `${priceSize * 1.55}px`,
+      }}
+    >
+      <img 
+        src={currentSrc} 
+        alt={`Precio ${item.price}`} 
+        className="h-full object-contain pointer-events-none"
+        onError={handleImageError}
+      />
+    </div>
+  );
+};
 
 interface AdPreviewProps {
   items: AdItem[];
@@ -13,6 +126,7 @@ interface AdPreviewProps {
 
 const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, selectedId, onSelectItem, onReorder }, ref) => {
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggingIndex(index);
@@ -64,6 +178,200 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
 
     return { ...baseStyles, minHeight: '800px' };
   };
+
+  const getCardStyles = () => {
+    return {
+      backgroundColor: config.backgroundColor,
+      backgroundImage: config.backgroundSrc ? `url(${config.backgroundSrc})` : 'none',
+      backgroundSize: config.backgroundSplit && config.backgroundSplit !== 'none' ? '200% 100%' : 'cover',
+      backgroundPosition: config.backgroundSplit === 'left' ? 'left center' : (config.backgroundSplit === 'right' ? 'right center' : 'center'),
+      fontFamily: config.fontFamily,
+      width: '600px',
+      height: '800px',
+    };
+  };
+
+  const exportSingleCard = async (item: AdItem) => {
+    const element = document.getElementById(`product-card-${item.id}`);
+    if (!element) return;
+    try {
+      setExportingId(item.id);
+      // Give React a brief moment to update the state so that the editor highlight border is hidden before capture
+      await new Promise(resolve => setTimeout(resolve, 80));
+      const dataUrl = await toJpeg(element, {
+        quality: 0.98,
+        pixelRatio: 3, // Excellent high quality! 3 * 600 = 1800px width (Perfect 3:4 TikTok quality)
+        backgroundColor: config.backgroundColor,
+        cacheBust: true,
+      });
+      const link = document.createElement('a');
+      const sanitizedName = (item.name || 'product').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      link.download = `rxdg-tiktok-${sanitizedName}-${Date.now()}.jpg`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error exporting single card', err);
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  if (config.mode === 'inp_card') {
+    return (
+      <div 
+        ref={ref} 
+        className="flex flex-col gap-8 max-w-[1300px] w-full p-4 select-none"
+      >
+        <div className="flex flex-col gap-1 text-center sm:text-left">
+          <h2 className="text-xl font-black text-white tracking-tight uppercase flex items-center gap-2 justify-center sm:justify-start">
+            <span className="w-2.5 h-6 rounded bg-brand-orange inline-block" />
+            Mesas de Trabajo (TikTok 3:4)
+          </h2>
+          <p className="text-xs text-neutral-400">Cada producto se renderiza de forma independiente en una mesa de trabajo de proporción 3:4, con su propio precio automático.</p>
+        </div>
+
+        <div className="flex flex-wrap gap-12 justify-center">
+          {items.map((item, index) => {
+            const isSelected = selectedId === item.id && exportingId !== item.id;
+            
+            return (
+              <div 
+                key={item.id}
+                className="flex flex-col gap-3"
+              >
+                {/* Artboard Header */}
+                <div className="flex items-center justify-between px-2 text-xs font-semibold text-neutral-400">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-brand-orange text-white flex items-center justify-center font-bold text-[10px]">
+                      {index + 1}
+                    </span>
+                    <span className="truncate max-w-[200px] text-neutral-300 font-bold uppercase">
+                      {item.name || `Producto ${index + 1}`}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        exportSingleCard(item);
+                      }}
+                      className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 hover:text-white rounded text-brand-orange flex items-center gap-1.5 text-[11px] font-bold border border-neutral-700 transition-colors cursor-pointer"
+                      title="Exportar esta mesa de trabajo"
+                    >
+                      <Download size={12} />
+                      Exportar 3:4
+                    </button>
+                  </div>
+                </div>
+
+                {/* The 3:4 Canvas Card */}
+                <div 
+                  id={`product-card-${item.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectItem(item.id);
+                  }}
+                  className="relative cursor-pointer rounded-none border-0 transition-all duration-300 shadow-2xl flex flex-col overflow-hidden bg-cover bg-center"
+                  style={getCardStyles()}
+                >
+                  {/* Card Background Overlay (to mimic split background or card background custom style) */}
+                  {config.cardBackgroundSrc && (
+                    <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
+                      <img src={config.cardBackgroundSrc} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+
+                  {/* --- LOGO (Esquina Superior Derecha) --- */}
+                  <div className="absolute top-6 right-6 z-20 pointer-events-none flex items-center justify-end">
+                    {config.headerLogoSrc ? (
+                        <img 
+                          src={config.headerLogoSrc} 
+                          alt="Logo" 
+                          className="w-auto max-h-[70px] max-w-[180px] object-contain drop-shadow-2xl"
+                        />
+                    ) : (
+                        <div className="border border-dashed border-white/20 rounded px-3 py-1.5 text-white/40 text-[10px] font-bold uppercase tracking-widest bg-black/10 backdrop-blur-sm">
+                            LOGO AQUÍ
+                        </div>
+                    )}
+                  </div>
+
+                  {/* --- PRODUCT IMAGE DISPLAY --- */}
+                  <div className="flex-1 relative z-10 w-full flex items-center justify-center">
+                    <div 
+                      className="absolute inset-0 pointer-events-none flex items-center justify-center"
+                      style={{ clipPath: item.allowOverflow ? 'inset(-1000px 0px 0px 0px)' : 'inset(0px)' }}
+                    >
+                      <img 
+                        src={item.imageSrc} 
+                        alt="Product" 
+                        className="w-full h-full object-contain"
+                        style={{ 
+                          transform: `translate(${item.offsetX || 0}px, ${item.offsetY}px) scale(${item.scale / 100})`,
+                          maskImage: (!item.allowOverflow && (item.fadeTop || item.fadeBottom || item.fadeLeft || item.fadeRight))
+                            ? `linear-gradient(to right, transparent, black ${item.fadeLeft || 0}%, black ${100 - (item.fadeRight || 0)}%, transparent), 
+                               linear-gradient(to bottom, transparent, black ${item.fadeTop || 0}%, black ${100 - (item.fadeBottom || 0)}%, transparent)` 
+                            : 'none',
+                          WebkitMaskImage: (!item.allowOverflow && (item.fadeTop || item.fadeBottom || item.fadeLeft || item.fadeRight))
+                            ? `linear-gradient(to right, transparent, black ${item.fadeLeft || 0}%, black ${100 - (item.fadeRight || 0)}%, transparent), 
+                               linear-gradient(to bottom, transparent, black ${item.fadeTop || 0}%, black ${100 - (item.fadeBottom || 0)}%, transparent)` 
+                            : 'none',
+                          maskComposite: 'intersect',
+                          WebkitMaskComposite: 'source-in',
+                        }}
+                      />
+                    </div>
+
+                    {/* Price Tag (Centered inside each card) */}
+                    <div className={`absolute bottom-4 left-4 right-4 flex flex-col ${item.span >= 2 ? 'items-start pl-2' : 'items-center'} justify-center z-20 pointer-events-none`}>
+                      <PriceImage item={item} priceSize={config.priceSize * 1.1} fontFamily={config.fontFamily} />
+                    </div>
+                  </div>
+
+                  {/* --- FOOTER (Siempre debajo) --- */}
+                  <div 
+                    className="h-16 w-full mt-auto flex items-center justify-center text-white text-3xl uppercase tracking-wider relative z-10 overflow-hidden"
+                    style={{ 
+                      backgroundColor: config.useFooterImage ? 'transparent' : config.footerColor,
+                      fontFamily: config.fontFamily === 'Inter' ? undefined : config.fontFamily
+                    }}
+                  >
+                     {config.useFooterImage && config.footerImageSrc ? (
+                       <img 
+                         src={config.footerImageSrc} 
+                         alt="Footer" 
+                         className="h-full w-auto max-h-[85%] object-contain"
+                         style={{ transform: 'translateY(-5px)' }}
+                       />
+                     ) : (
+                       <span className="relative drop-shadow-md">{config.footerText}</span>
+                     )}
+                  </div>
+                  
+                  {isSelected && (
+                    <div className="absolute inset-0 border-4 border-yellow-400 pointer-events-none z-50">
+                      <div className="absolute top-2 left-2 bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md uppercase animate-pulse">
+                        EDITANDO
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {items.length === 0 && (
+          <div className="h-64 border-4 border-dashed border-white/20 rounded-xl flex items-center justify-center text-white/30 font-bold text-2xl uppercase backdrop-blur-sm bg-black/20">
+              Arrastra o sube imágenes para comenzar
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -165,46 +473,8 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
                     </div>
 
                     {/* Price Tag & Info */}
-                    <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-1 pointer-events-none z-20">
-                      {config.priceTagBgSrc ? (
-                        <div 
-                          className="self-start relative flex items-center justify-center select-none"
-                          style={{
-                            backgroundImage: `url(${config.priceTagBgSrc})`,
-                            backgroundSize: 'contain',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            height: `${config.priceSize * 1.35}px`,
-                            width: `${config.priceSize * 1.35 * (1208 / 465)}px`,
-                          }}
-                        >
-                          <span 
-                            className="text-white tracking-wider leading-none text-center font-bold"
-                            style={{ 
-                              fontSize: `${config.priceSize}px`,
-                              fontFamily: config.fontFamily === 'Inter' ? undefined : config.fontFamily,
-                              transform: 'translateY(-2%)'
-                            }}
-                          >
-                            {item.price}
-                          </span>
-                        </div>
-                      ) : (
-                        <div 
-                          className="self-start bg-neutral-900/90 px-4 py-2 rounded transform -skew-x-12 border-l-4 shadow-lg"
-                          style={{ borderColor: config.priceTagColor }}
-                        >
-                          <span 
-                              className="block transform skew-x-12 text-white tracking-wider leading-none"
-                              style={{ 
-                                fontSize: `${config.priceSize}px`,
-                                fontFamily: config.fontFamily === 'Inter' ? undefined : config.fontFamily
-                              }}
-                            >
-                            {item.price}
-                          </span>
-                        </div>
-                      )}
+                    <div className={`absolute bottom-4 left-4 right-4 flex flex-col ${item.span >= 2 ? 'items-start' : 'items-center'} gap-1 pointer-events-none z-20`}>
+                      <PriceImage item={item} priceSize={config.priceSize} fontFamily={config.fontFamily} />
                     </div>
 
                     {isSelected && (
