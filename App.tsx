@@ -5,6 +5,7 @@ import EditorSidebar from './components/EditorSidebar';
 import AdPreview from './components/AdPreview';
 import { Download, Layout, Menu, Maximize2, Minimize2, ChevronLeft, ChevronRight, Monitor } from 'lucide-react';
 import { toJpeg, toPng, toBlob } from 'html-to-image';
+import { PRICE_TAGS, formatPriceTag, nearestPriceTag } from './priceTags';
 
 export default function App() {
   // --- State ---
@@ -111,12 +112,11 @@ export default function App() {
       
       for (const file of files) {
         const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-        let extractedPrice = 'S/19.99'; 
         const priceMatch = nameWithoutExt.match(/(?:[\s\-_]|\b)S(?:\/\.|\/)?\s*(\d+(?:\.\d+)?)$/i) || nameWithoutExt.match(/\s+(\d+(?:\.\d+)?)$/);
-        
-        if (priceMatch && priceMatch[1]) {
-            extractedPrice = `S/. ${parseFloat(priceMatch[1])}`;
-        }
+        // Se ajusta siempre al precio más cercano que tenga imagen en PRECIOS,
+        // para que el texto y la imagen del precio queden vinculados desde el inicio.
+        const rawPrice = priceMatch && priceMatch[1] ? parseFloat(priceMatch[1]) : PRICE_TAGS[0];
+        const extractedPrice = formatPriceTag(nearestPriceTag(rawPrice));
 
         // Optimizamos la imagen antes de añadirla al estado
         const optimizedSrc = await resizeImage(file);

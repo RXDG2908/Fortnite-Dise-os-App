@@ -2,25 +2,11 @@
 import React, { useState } from 'react';
 import { AdItem, AdConfig, SPAN_OPTIONS } from '../types';
 import { Upload, Trash, ArrowUp, ArrowDown, Palette, Image as ImageIcon, X, MoveVertical, MoveHorizontal, ZoomIn, Grid3x3, Grid2x2, Maximize, Square, Type, Link, QrCode, ShoppingCart, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { PRICE_TAG_OPTIONS, priceTagFilename, nearestPriceTag, parsePriceValue, formatPriceTag } from '../priceTags';
 
 function getPriceImageFilename(price: string): string {
   if (!price) return 'S0.png';
-  let clean = price.trim().toUpperCase().replace(/\s+/g, '');
-  
-  // Normalize prefix by stripping "S/.", "S/", "S"
-  const cleanNum = clean.replace(/^S\/\./, '').replace(/^S\//, '').replace(/^S/, '').trim();
-  const num = parseFloat(cleanNum);
-  
-  if (!isNaN(num)) {
-    // Specific match for "S/.4" -> "S3.png" as user requested
-    if (num === 4) {
-      return 'S3.png';
-    }
-    return `S${num}.png`;
-  }
-  
-  // Fallback if not a clean number
-  return clean.endsWith('.png') ? clean : `${clean}.png`;
+  return priceTagFilename(nearestPriceTag(parsePriceValue(price)));
 }
 
 interface EditorSidebarProps {
@@ -587,17 +573,21 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
             {/* Price */}
             <div className="space-y-1">
-              <label className="text-xs text-neutral-400 font-medium">Price (Fallback Texto)</label>
+              <label className="text-xs text-neutral-400 font-medium">Precio</label>
               <div className="relative">
-                <input 
-                  type="text" 
-                  value={selectedItem.price}
+                <select
+                  value={formatPriceTag(nearestPriceTag(parsePriceValue(selectedItem.price)))}
                   onChange={(e) => updateItem(selectedItem.id, { price: e.target.value })}
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 pl-3 text-white font-bold tracking-wider focus:ring-1 focus:ring-brand-orange focus:outline-none"
-                />
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 pl-3 text-white font-bold tracking-wider focus:ring-1 focus:ring-brand-orange focus:outline-none appearance-none cursor-pointer"
+                >
+                  {PRICE_TAG_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
               </div>
               <p className="text-[10px] text-neutral-400 mt-1 italic">
-                Auto-imagen buscada: <code className="text-brand-orange bg-neutral-950 px-1 py-0.5 rounded font-mono">/images/logo/PRECIOS/{getPriceImageFilename(selectedItem.price)}</code>
+                Solo se listan precios con imagen disponible, así siempre coincide con: <code className="text-brand-orange bg-neutral-950 px-1 py-0.5 rounded font-mono">/images/logo/PRECIOS/{getPriceImageFilename(selectedItem.price)}</code>
               </p>
             </div>
 

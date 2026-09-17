@@ -4,25 +4,14 @@ import { AdItem, AdConfig } from '../types';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toJpeg } from 'html-to-image';
 import { Download } from 'lucide-react';
+import { priceTagFilename, nearestPriceTag, parsePriceValue } from '../priceTags';
 
 function getPriceImageFilename(price: string): string {
   if (!price) return 'S0.png';
-  let clean = price.trim().toUpperCase().replace(/\s+/g, '');
-  
-  // Normalize prefix by stripping "S/.", "S/", "S"
-  const cleanNum = clean.replace(/^S\/\./, '').replace(/^S\//, '').replace(/^S/, '').trim();
-  const num = parseFloat(cleanNum);
-  
-  if (!isNaN(num)) {
-    // Specific match for "S/.4" -> "S3.png" as user requested
-    if (num === 4) {
-      return 'S3.png';
-    }
-    return `S${num}.png`;
-  }
-  
-  // Fallback if not a clean number
-  return clean.endsWith('.png') ? clean : `${clean}.png`;
+  // El precio en texto puede no coincidir con ninguna imagen disponible
+  // (public/images/logo/PRECIOS solo tiene ciertos valores). Se ajusta al
+  // más cercano para que texto e imagen siempre queden vinculados.
+  return priceTagFilename(nearestPriceTag(parsePriceValue(price)));
 }
 
 interface PriceImageProps {
@@ -149,13 +138,20 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
   // --- Lógica de Dimensiones Constantes Mejorada ---
   // Aumentamos el padding para un mejor centrado visual
   // px-16 equivale a 64px por lado. Total = 128px
-  const horizontalPadding = 128; 
-  const gapSize = 16;
+  const horizontalPadding = 128;
+  const gapSize = 16; // Gap real de la tienda oficial de Fortnite (~16px / gap: 1rem)
   const availableWidth = 1200 - horizontalPadding;
   const columnWidth = (availableWidth - (gapSize * (config.gridColumns - 1))) / config.gridColumns;
 
-  // Altura base fija para mantener la proporción alargada de la imagen (estilo Fortnite)
-  const baseHeight = 380; 
+  // Las cards individuales (span 1) son verticales tipo retrato, igual que en fortnite.com
+  // (Size_1_x_1 = 1024x1632, aspecto 1.594:1). Las cards anchas (2x, 3x, 4x) son más bajas,
+  // tipo banner horizontal, y mantienen la altura de una sola columna (igual que antes).
+  const PORTRAIT_ASPECT = 1632 / 1024;
+  const baseHeight = columnWidth;
+  const portraitHeight = columnWidth * PORTRAIT_ASPECT;
+
+  // Radio de esquina real de Fortnite: 40px sobre una card base de 512px (~7.8% del ancho).
+  const cardRadius = Math.round(columnWidth * (40 / 512));
 
   const getContainerStyles = () => {
     const baseStyles: React.CSSProperties = {
@@ -407,7 +403,7 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
                   4: 'col-span-4'
                 }[item.span];
 
-                const finalHeight = baseHeight;
+                const finalHeight = item.span === 1 ? portraitHeight : baseHeight;
 
                 const isSelected = selectedId === item.id;
                 const isDragging = draggingIndex === index;
@@ -425,15 +421,15 @@ const AdPreview = forwardRef<HTMLDivElement, AdPreviewProps>(({ items, config, s
                     }}
                     className={`
                       ${colSpanClass}
-                      relative group cursor-pointer rounded-xl border-4 transition-all duration-200 shadow-2xl
-                      ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/30 z-20 scale-[1.02]' : 'border-transparent hover:border-white/30'}
+                      relative group cursor-pointer border-4 transition-all duration-200
+                      ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/30 z-20 scale-[1.02] shadow-2xl' : 'border-transparent hover:border-white/30'}
                       ${isDragging ? 'opacity-40 border-dashed border-white' : ''}
                       overflow-visible
                     `}
-                    style={{ height: `${finalHeight}px` }}
+                    style={{ height: `${finalHeight}px`, borderRadius: `${cardRadius}px` }}
                   >
-                    {/* Background Layer (Visual Box) */}
-                    <div className="absolute inset-0 rounded-lg overflow-hidden z-0">
+                    {/* Background Layer (Visual Box) — sin stroke ni sombra, solo esquinas suaves como en la tienda real */}
+                    <div className="absolute inset-0 overflow-hidden z-0" style={{ borderRadius: `${cardRadius}px` }}>
                       <div 
                         className="w-full h-full relative"
                         style={{ 
